@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 
 /* =========================
    TYPES
@@ -21,9 +21,15 @@ type Challenge = NumberChallenge | ExpressionChallenge
 
 type GameStatus = "playing" | "ended"
 
+
 /* =========================
    HELPERS
 ========================= */
+function playSound(audio: HTMLAudioElement | null) {
+  if (!audio) return
+  audio.currentTime = 0
+  audio.play().catch(() => {})
+}
 
 function randomInt0to9(): number {
   return Math.floor(Math.random() * 10)
@@ -125,10 +131,14 @@ export default function EvenOddGame() {
   const [queue, setQueue] = useState<Challenge[]>(() =>
     generateQueue(5, 0)
   )
+
+const correctSound = useRef<HTMLAudioElement | null>(null)
+const wrongSound = useRef<HTMLAudioElement | null>(null)
+
   const [score, setScore] = useState(0)
   const [combo, setCombo] = useState(0)
   const [timeLeft, setTimeLeft] = useState(60)
-  const [status, setStatus] = useState<GameStatus>("playing")
+  const [status, setStatus] = useState<GameStatus>("ended")
   const [feedback, setFeedback] = useState<string | null>(null)
   const [isLocked, setIsLocked] = useState(false)
 
@@ -153,6 +163,11 @@ export default function EvenOddGame() {
 
     return () => clearInterval(interval)
   }, [status])
+//sounds
+  useEffect(() => {
+    correctSound.current = new Audio("/public/sounds/correct.mp3")
+    wrongSound.current = new Audio("/public/sounds/incorrect.mp3")
+  }, [])
 
   /* ===== QUEUE ADVANCE ===== */
 
@@ -170,8 +185,11 @@ export default function EvenOddGame() {
       (guess === "odd" && !isChallengeEven(current))
   
       if (correct) {
+        playSound(correctSound.current)
         const nextCombo = combo + 1
         const scoreGain = getScoreGain(nextCombo)
+        
+
       
         setScore((s) => s + scoreGain)
         setCombo(nextCombo)
@@ -183,6 +201,8 @@ export default function EvenOddGame() {
       
   
     // ❌ WRONG
+    playSound(wrongSound.current)
+
     setFeedback("Wrong!")
     setCombo(0)
     setIsLocked(true)
@@ -191,7 +211,7 @@ export default function EvenOddGame() {
       setIsLocked(false)
       setFeedback(null)
       advanceQueue(0)
-    }, 1000)
+    }, 2000)
   }
   
 
@@ -204,7 +224,9 @@ export default function EvenOddGame() {
       if (e.repeat || isLocked) return
 
       if (e.key === "f" || e.key === "F") handleGuess("even")
+        if (e.key === "d" || e.key === "D") handleGuess("even")
       if (e.key === "j" || e.key === "J") handleGuess("odd")
+        if (e.key === "k" || e.key === "K") handleGuess("odd")
     }
 
     window.addEventListener("keydown", onKeyDown)
@@ -240,7 +262,7 @@ export default function EvenOddGame() {
         {preview.map((c, i) => (
           <div
             key={i}
-            className="w-10 h-10 flex items-center justify-center rounded bg-gray-800 text-sm font-mono opacity-70"
+            className="w-30 h-10 flex items-center justify-center rounded bg-gray-800 text-2xl font-mono opacity-70"
           >
             {c.type === "number"
               ? c.value
@@ -272,14 +294,14 @@ export default function EvenOddGame() {
           disabled={isLocked || status !== "playing"}
           className="px-6 py-3 bg-blue-600 rounded disabled:opacity-40"
         >
-          Even (F)
+          Even (F)(D)
         </button>
         <button
           onClick={() => handleGuess("odd")}
           disabled={isLocked || status !== "playing"}
           className="px-6 py-3 bg-pink-600 rounded disabled:opacity-40"
         >
-          Odd (J)
+          Odd (J)(K)
         </button>
       </div>
 
@@ -295,11 +317,6 @@ export default function EvenOddGame() {
         <span>Time: {timeLeft}s</span>
       </div>
 
-      {combo > 0 && combo % 10 === 0 && (
-        <div className="text-green-400 animate-pulse">
-          New mechanic unlocked!
-        </div>
-      )}
 
       {status === "ended" && (
         <button
